@@ -25,17 +25,18 @@ jobs:
       - name: Install Android SDK command-line tools
         shell: bash
         run: |
-          mkdir -p "$HOME/android-sdk/cmdline-tools"
+          mkdir -p "$HOME/android-sdk"
           cd "$HOME/android-sdk"
           curl -o commandlinetools.zip -L https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-          unzip -q commandlinetools.zip
+          unzip -q commandlinetools.zip -d cmdline-tools-temp
           mkdir -p cmdline-tools/latest
-          mv cmdline-tools/* cmdline-tools/latest/
+          mv cmdline-tools-temp/cmdline-tools/* cmdline-tools/latest/
+          rm -rf cmdline-tools-temp commandlinetools.zip
           yes | cmdline-tools/latest/bin/sdkmanager --sdk_root="$HOME/android-sdk" --licenses
           cmdline-tools/latest/bin/sdkmanager --sdk_root="$HOME/android-sdk" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
         env:
-          ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
-          ANDROID_HOME: ${{ github.workspace }}/android-sdk
+          ANDROID_SDK_ROOT: $HOME/android-sdk
+          ANDROID_HOME: $HOME/android-sdk
 
       - name: Grant execute permission for Gradle wrapper
         run: chmod +x gradlew
