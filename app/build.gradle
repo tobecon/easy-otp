@@ -14,8 +14,15 @@ android {
         versionName "1.0"
     }
 
+    signingConfigs {
+        debug {
+            // Use the default debug keystore for CI builds so release APKs are signed and installable.
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig signingConfigs.debug
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
