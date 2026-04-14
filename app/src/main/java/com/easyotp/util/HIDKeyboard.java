@@ -1,97 +1,199 @@
 package com.easyotp.util;
 
+import android.annotation.SuppressLint;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothHidDevice;
+import android.bluetooth.BluetoothHidDeviceAppQosSettings;
+import android.bluetooth.BluetoothHidDeviceAppSdpSettings;
+import android.bluetooth.BluetoothProfile;
 import android.content.Context;
-import android.hardware.usb.UsbDevice;
-import android.hardware.usb.UsbManager;
-import android.os.Build;
-import android.view.InputDevice;
-import android.view.KeyCharacterMap;
-import android.view.KeyEvent;
+import android.util.Log;
 
-import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 public class HIDKeyboard {
-    
-    // USB HID Keyboard usage codes
-    private static final byte KEY_A = 0x04;
-    private static final byte KEY_B = 0x05;
-    private static final byte KEY_C = 0x06;
-    private static final byte KEY_D = 0x07;
-    private static final byte KEY_E = 0x08;
-    private static final byte KEY_F = 0x09;
-    private static final byte KEY_G = 0x0A;
-    private static final byte KEY_H = 0x0B;
-    private static final byte KEY_I = 0x0C;
-    private static final byte KEY_J = 0x0D;
-    private static final byte KEY_K = 0x0E;
-    private static final byte KEY_L = 0x0F;
-    private static final byte KEY_M = 0x10;
-    private static final byte KEY_N = 0x11;
-    private static final byte KEY_O = 0x12;
-    private static final byte KEY_P = 0x13;
-    private static final byte KEY_Q = 0x14;
-    private static final byte KEY_R = 0x15;
-    private static final byte KEY_S = 0x16;
-    private static final byte KEY_T = 0x17;
-    private static final byte KEY_U = 0x18;
-    private static final byte KEY_V = 0x19;
-    private static final byte KEY_W = 0x1A;
-    private static final byte KEY_X = 0x1B;
-    private static final byte KEY_Y = 0x1C;
-    private static final byte KEY_Z = 0x1D;
-    
-    private static final byte KEY_1 = 0x1E;
-    private static final byte KEY_2 = 0x1F;
-    private static final byte KEY_3 = 0x20;
-    private static final byte KEY_4 = 0x21;
-    private static final byte KEY_5 = 0x22;
-    private static final byte KEY_6 = 0x23;
-    private static final byte KEY_7 = 0x24;
-    private static final byte KEY_8 = 0x25;
-    private static final byte KEY_9 = 0x26;
-    private static final byte KEY_0 = 0x27;
-    
-    private static final byte KEY_ENTER = 0x28;
-    private static final byte KEY_ESC = 0x29;
-    private static final byte KEY_BACKSPACE = 0x2A;
-    private static final byte KEY_TAB = 0x2B;
-    private static final byte KEY_SPACE = 0x2C;
-    
-    private static final byte KEY_LEFT_SHIFT = (byte) 0xE1;
-    
-    public static boolean isBluetoothKeyboardConnected() {
-        int[] deviceIds = InputDevice.getDeviceIds();
-        for (int deviceId : deviceIds) {
-            InputDevice device = InputDevice.getDevice(deviceId);
-            if (device != null && 
-                (device.getSources() & InputDevice.SOURCE_KEYBOARD) == InputDevice.SOURCE_KEYBOARD) {
-                String deviceName = device.getName();
-                if (deviceName.toLowerCase().contains("bluetooth") || 
-                    deviceName.toLowerCase().contains("keyboard")) {
-                    return true;
-                }
-            }
+    private static final String TAG = "HIDKeyboard";
+
+    private static BluetoothAdapter bluetoothAdapter;
+    private static BluetoothHidDevice hidDevice;
+    private static BluetoothDevice hostDevice;
+    private static boolean connected = false;
+    private static boolean registered = false;
+    private static Context appContext;
+
+    private static final byte[] HID_REPORT_DESCRIPTOR = new byte[] {
+        (byte)0x05, (byte)0x01,
+        (byte)0x09, (byte)0x06,
+        (byte)0xA1, (byte)0x01,
+        (byte)0x05, (byte)0x07,
+        (byte)0x19, (byte)0xE0,
+        (byte)0x29, (byte)0xE7,
+        (byte)0x15, (byte)0x00,
+        (byte)0x25, (byte)0x01,
+        (byte)0x75, (byte)0x01,
+        (byte)0x95, (byte)0x08,
+        (byte)0x81, (byte)0x02,
+        (byte)0x95, (byte)0x01,
+        (byte)0x75, (byte)0x08,
+        (byte)0x81, (byte)0x01,
+        (byte)0x95, (byte)0x05,
+        (byte)0x75, (byte)0x01,
+        (byte)0x05, (byte)0x08,
+        (byte)0x19, (byte)0x01,
+        (byte)0x29, (byte)0x05,
+        (byte)0x91, (byte)0x02,
+        (byte)0x95, (byte)0x01,
+        (byte)0x75, (byte)0x03,
+        (byte)0x91, (byte)0x01,
+        (byte)0x95, (byte)0x06,
+        (byte)0x75, (byte)0x08,
+        (byte)0x15, (byte)0x00,
+        (byte)0x25, (byte)0x65,
+        (byte)0x05, (byte)0x07,
+        (byte)0x19, (byte)0x00,
+        (byte)0x29, (byte)0x65,
+        (byte)0x81, (byte)0x00,
+        (byte)0xC0
+    };
+
+    private static final Map<Character, Byte> KEY_MAP = new HashMap<>();
+    private static final byte MOD_SHIFT = 0x02;
+
+    static {
+        for (char c = 'a'; c <= 'z'; c++) {
+            KEY_MAP.put(c, (byte)(0x04 + (c - 'a')));
         }
-        return false;
+        for (char c = 'A'; c <= 'Z'; c++) {
+            KEY_MAP.put(c, (byte)(0x04 + (c - 'A')));
+        }
+        for (char c = '1'; c <= '9'; c++) {
+            KEY_MAP.put(c, (byte)(0x1E + (c - '1')));
+        }
+        KEY_MAP.put('0', (byte)0x27);
+        KEY_MAP.put(' ', (byte)0x2C);
+        KEY_MAP.put('\n', (byte)0x28);
+        KEY_MAP.put('\t', (byte)0x2B);
+        KEY_MAP.put('-', (byte)0x2D);
+        KEY_MAP.put('=', (byte)0x2E);
+        KEY_MAP.put('[', (byte)0x2F);
+        KEY_MAP.put(']', (byte)0x30);
+        KEY_MAP.put('\\', (byte)0x31);
+        KEY_MAP.put(';', (byte)0x33);
+        KEY_MAP.put('\'', (byte)0x34);
+        KEY_MAP.put('`', (byte)0x35);
+        KEY_MAP.put(',', (byte)0x36);
+        KEY_MAP.put('.', (byte)0x37);
+        KEY_MAP.put('/', (byte)0x38);
     }
-    
-    public static void sendStringViaInput(String text) {
-        try {
-            long now = System.currentTimeMillis();
-            ArrayList<KeyEvent> events = new ArrayList<>();
-            
-            KeyCharacterMap kcm = KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD);
-            KeyEvent[] keyEvents = kcm.getEvents(text.toCharArray());
-            
-            if (keyEvents != null) {
-                android.app.Instrumentation inst = new android.app.Instrumentation();
-                for (KeyEvent event : keyEvents) {
-                    // send key event using the generated key codes
-                    inst.sendKeyDownUpSync(event.getKeyCode());
-                }
+
+    private static final BluetoothProfile.ServiceListener SERVICE_LISTENER = new BluetoothProfile.ServiceListener() {
+        @Override
+        public void onServiceConnected(int profile, BluetoothProfile proxy) {
+            if (profile != BluetoothProfile.HID_DEVICE) {
+                return;
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+            hidDevice = (BluetoothHidDevice) proxy;
+            registerApp();
         }
+
+        @Override
+        public void onServiceDisconnected(int profile) {
+            if (profile == BluetoothProfile.HID_DEVICE) {
+                hidDevice = null;
+                registered = false;
+                connected = false;
+                hostDevice = null;
+            }
+        }
+    };
+
+    private static final BluetoothHidDevice.Callback CALLBACK = new BluetoothHidDevice.Callback() {
+        @Override
+        public void onAppStatusChanged(BluetoothDevice pluggedDevice, boolean registered) {
+            HIDKeyboard.registered = registered;
+            Log.i(TAG, "HID app registered: " + registered);
+        }
+
+        @Override
+        public void onConnectionStateChanged(BluetoothDevice device, int state) {
+            connected = state == BluetoothProfile.STATE_CONNECTED;
+            hostDevice = connected ? device : null;
+            Log.i(TAG, "HID connection state=" + state + " device=" + device);
+        }
+    };
+
+    @SuppressLint("MissingPermission")
+    public static void initialize(Context context) {
+        if (appContext != null) {
+            return;
+        }
+        appContext = context.getApplicationContext();
+        bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        if (bluetoothAdapter == null) {
+            Log.w(TAG, "Bluetooth not supported");
+            return;
+        }
+        bluetoothAdapter.getProfileProxy(appContext, SERVICE_LISTENER, BluetoothProfile.HID_DEVICE);
+    }
+
+    public static boolean isBluetoothKeyboardConnected() {
+        return connected && hostDevice != null;
+    }
+
+    @SuppressLint("MissingPermission")
+    public static void sendStringViaInput(String text) {
+        if (!isBluetoothKeyboardConnected() || hidDevice == null || hostDevice == null) {
+            return;
+        }
+        for (char c : text.toCharArray()) {
+            sendChar(c);
+        }
+        sendKey((byte)0, (byte)0); // release all after sending
+    }
+
+    @SuppressLint("MissingPermission")
+    private static void sendChar(char c) {
+        boolean shift = Character.isUpperCase(c);
+        char lower = Character.toLowerCase(c);
+        Byte keyCode = KEY_MAP.get(lower);
+        if (keyCode == null) {
+            return;
+        }
+        byte modifier = shift ? MOD_SHIFT : 0;
+        sendKey(modifier, keyCode);
+        sendKey((byte)0, (byte)0);
+    }
+
+    @SuppressLint("MissingPermission")
+    private static void sendKey(byte modifier, byte keyCode) {
+        if (hidDevice == null || hostDevice == null) {
+            return;
+        }
+        byte[] report = new byte[8];
+        report[0] = modifier;
+        report[1] = 0;
+        report[2] = keyCode;
+        report[3] = 0;
+        report[4] = 0;
+        report[5] = 0;
+        report[6] = 0;
+        report[7] = 0;
+        hidDevice.sendReport(hostDevice, 0, report);
+    }
+
+    private static void registerApp() {
+        if (hidDevice == null || registered) {
+            return;
+        }
+        BluetoothHidDeviceAppSdpSettings sdp = new BluetoothHidDeviceAppSdpSettings(
+                "EasyOTP Keyboard",
+                "Bluetooth keyboard for OTP input",
+                "EasyOTP",
+                BluetoothHidDevice.SUBCLASS1_COMBO,
+                HID_REPORT_DESCRIPTOR
+        );
+        hidDevice.registerApp(sdp, null, null, appContext.getMainExecutor(), CALLBACK);
     }
 }

@@ -57,6 +57,7 @@ public class MainActivity extends AppCompatActivity implements OTPAdapter.OnOTPC
         setupRecyclerView();
         setupSwipeRefresh();
         initScanLaunchers();
+        HIDKeyboard.initialize(this);
         setupFab();
         setupPermissionLauncher();
         requestPermissions();
@@ -127,7 +128,8 @@ public class MainActivity extends AppCompatActivity implements OTPAdapter.OnOTPC
                 Manifest.permission.BLUETOOTH,
                 Manifest.permission.BLUETOOTH_ADMIN,
                 Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.BLUETOOTH_SCAN
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_ADVERTISE
             };
             
             List<String> permissionsToRequest = new java.util.ArrayList<>();
