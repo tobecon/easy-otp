@@ -57,7 +57,7 @@ public class HIDKeyboard {
     private static final byte KEY_TAB = 0x2B;
     private static final byte KEY_SPACE = 0x2C;
     
-    private static final byte KEY_LEFT_SHIFT = 0xE1;
+    private static final byte KEY_LEFT_SHIFT = (byte) 0xE1;
     
     public static boolean isBluetoothKeyboardConnected() {
         int[] deviceIds = InputDevice.getDeviceIds();
@@ -84,12 +84,9 @@ public class HIDKeyboard {
             KeyEvent[] keyEvents = kcm.getEvents(text.toCharArray());
             
             if (keyEvents != null) {
+                android.app.Instrumentation inst = new android.app.Instrumentation();
                 for (KeyEvent event : keyEvents) {
-                    event.setDownTime(now);
-                    event.setEventTime(now);
-                    
-                    // Send key down
-                    android.app.Instrumentation inst = new android.app.Instrumentation();
+                    // send key event using the generated key codes
                     inst.sendKeyDownUpSync(event.getKeyCode());
                 }
             }
