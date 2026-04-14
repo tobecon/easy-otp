@@ -238,7 +238,8 @@ public class MainActivity extends AppCompatActivity implements OTPAdapter.OnOTPC
             HIDKeyboard.sendStringViaInput(code);
             Toast.makeText(this, "Copied and typed via Bluetooth keyboard", Toast.LENGTH_SHORT).show();
         } else {
-            Toast.makeText(this, "Copied to clipboard; Bluetooth keyboard not connected", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Bluetooth not connected. Open Bluetooth Manager to connect.", Toast.LENGTH_LONG).show();
+            onBluetoothManagerSelected();
         }
     }
 
