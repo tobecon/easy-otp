@@ -6,4 +6,8 @@
     <string name="delete_account">Delete Account</string>
     <string name="copied_to_clipboard">Copied to clipboard</string>
     <string name="sent_via_bluetooth">Sent via Bluetooth Keyboard</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_bluetooth_manager">Bluetooth Manager</string>
+    <string name="drawer_open">Open navigation drawer</string>
+    <string name="drawer_close">Close navigation drawer</string>
 </resources>

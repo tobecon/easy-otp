@@ -17,13 +17,18 @@ import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.GravityCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.navigation.NavigationView;
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
 
@@ -43,6 +48,8 @@ public class MainActivity extends AppCompatActivity implements OTPAdapter.OnOTPC
     private FloatingActionButton fabAdd;
     private Handler handler;
     private Runnable refreshRunnable;
+    private DrawerLayout drawerLayout;
+    private MaterialToolbar toolbar;
     
     private ActivityResultLauncher<String[]> permissionLauncher;
     private ActivityResultLauncher<String> cameraPermissionLauncher;
@@ -70,6 +77,32 @@ public class MainActivity extends AppCompatActivity implements OTPAdapter.OnOTPC
         recyclerView = findViewById(R.id.recyclerView);
         swipeRefresh = findViewById(R.id.swipeRefresh);
         fabAdd = findViewById(R.id.fabAdd);
+        drawerLayout = findViewById(R.id.drawer_layout);
+        toolbar = findViewById(R.id.toolbar);
+
+        setSupportActionBar(toolbar);
+        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
+                this,
+                drawerLayout,
+                toolbar,
+                R.string.drawer_open,
+                R.string.drawer_close
+        );
+        drawerLayout.addDrawerListener(toggle);
+        toggle.syncState();
+
+        NavigationView navigationView = findViewById(R.id.nav_view);
+        navigationView.setNavigationItemSelectedListener(item -> {
+            int itemId = item.getItemId();
+            if (itemId == R.id.nav_home) {
+                onHomeSelected();
+            } else if (itemId == R.id.nav_bluetooth_manager) {
+                onBluetoothManagerSelected();
+            }
+            drawerLayout.closeDrawer(GravityCompat.START);
+            return true;
+        });
+        navigationView.setCheckedItem(R.id.nav_home);
     }
     
     private void setupRecyclerView() {
@@ -83,6 +116,32 @@ public class MainActivity extends AppCompatActivity implements OTPAdapter.OnOTPC
             refreshOTPList();
             swipeRefresh.setRefreshing(false);
         });
+    }
+    
+    private void onHomeSelected() {
+        if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
+            getSupportFragmentManager().popBackStack();
+        }
+    }
+
+    private void onBluetoothManagerSelected() {
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.content_frame, new BluetoothManagerFragment())
+                .addToBackStack(null)
+                .commit();
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (drawerLayout != null && drawerLayout.isDrawerOpen(GravityCompat.START)) {
+            drawerLayout.closeDrawer(GravityCompat.START);
+            return;
+        }
+        if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
+            getSupportFragmentManager().popBackStack();
+            return;
+        }
+        super.onBackPressed();
     }
     
     private void initScanLaunchers() {
