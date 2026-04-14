@@ -180,6 +180,16 @@ public class MainActivity extends AppCompatActivity implements OTPAdapter.OnOTPC
             Toast.makeText(this, "Copied to clipboard; Bluetooth keyboard not connected", Toast.LENGTH_SHORT).show();
         }
     }
+
+    @Override
+    public void onOTPEditClick(OTPAccount account, String code) {
+        showEditAccountDialog(account);
+    }
+
+    @Override
+    public void onOTPDeleteClick(OTPAccount account, String code) {
+        deleteAccount(account);
+    }
     
     @Override
     public void onOTPLongClick(OTPAccount account) {

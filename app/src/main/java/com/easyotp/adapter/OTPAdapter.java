@@ -23,6 +23,8 @@ public class OTPAdapter extends RecyclerView.Adapter<OTPAdapter.OTPViewHolder> {
     public interface OnOTPClickListener {
         void onOTPClick(OTPAccount account, String code);
         void onOTPActionClick(OTPAccount account, String code);
+        void onOTPEditClick(OTPAccount account, String code);
+        void onOTPDeleteClick(OTPAccount account, String code);
         void onOTPLongClick(OTPAccount account);
     }
     
@@ -51,6 +53,18 @@ public class OTPAdapter extends RecyclerView.Adapter<OTPAdapter.OTPViewHolder> {
         holder.btnSendCode.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onOTPActionClick(account, code);
+            }
+        });
+
+        holder.btnEditCode.setOnClickListener(v -> {
+            if (listener != null) {
+                listener.onOTPEditClick(account, code);
+            }
+        });
+
+        holder.btnDeleteCode.setOnClickListener(v -> {
+            if (listener != null) {
+                listener.onOTPDeleteClick(account, code);
             }
         });
 
@@ -90,6 +104,8 @@ public class OTPAdapter extends RecyclerView.Adapter<OTPAdapter.OTPViewHolder> {
         TextView tvAccount;
         TextView tvCode;
         Button btnSendCode;
+        Button btnEditCode;
+        Button btnDeleteCode;
         
         OTPViewHolder(View itemView) {
             super(itemView);
@@ -97,6 +113,8 @@ public class OTPAdapter extends RecyclerView.Adapter<OTPAdapter.OTPViewHolder> {
             tvAccount = itemView.findViewById(R.id.tvAccount);
             tvCode = itemView.findViewById(R.id.tvCode);
             btnSendCode = itemView.findViewById(R.id.btnSendCode);
+            btnEditCode = itemView.findViewById(R.id.btnEditCode);
+            btnDeleteCode = itemView.findViewById(R.id.btnDeleteCode);
         }
     }
 }
