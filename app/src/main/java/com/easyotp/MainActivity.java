@@ -24,6 +24,9 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import com.journeyapps.barcodescanner.ScanContract;
+import com.journeyapps.barcodescanner.ScanOptions;
+
 import com.easyotp.adapter.OTPAdapter;
 import com.easyotp.model.OTPAccount;
 import com.easyotp.util.HIDKeyboard;
@@ -42,6 +45,8 @@ public class MainActivity extends AppCompatActivity implements OTPAdapter.OnOTPC
     private Runnable refreshRunnable;
     
     private ActivityResultLauncher<String[]> permissionLauncher;
+    private ActivityResultLauncher<String> cameraPermissionLauncher;
+    private ActivityResultLauncher<ScanOptions> barcodeLauncher;
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,6 +56,7 @@ public class MainActivity extends AppCompatActivity implements OTPAdapter.OnOTPC
         initViews();
         setupRecyclerView();
         setupSwipeRefresh();
+        initScanLaunchers();
         setupFab();
         setupPermissionLauncher();
         requestPermissions();
@@ -76,6 +82,30 @@ public class MainActivity extends AppCompatActivity implements OTPAdapter.OnOTPC
             refreshOTPList();
             swipeRefresh.setRefreshing(false);
         });
+    }
+    
+    private void initScanLaunchers() {
+        barcodeLauncher = registerForActivityResult(
+            new ScanContract(),
+            result -> {
+                if (result != null && result.getContents() != null) {
+                    parseOtpUri(result.getContents());
+                } else {
+                    Toast.makeText(this, "No QR code detected", Toast.LENGTH_SHORT).show();
+                }
+            }
+        );
+
+        cameraPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(),
+            granted -> {
+                if (granted) {
+                    launchQrScanner();
+                } else {
+                    Toast.makeText(this, "Camera permission is required for QR scanning", Toast.LENGTH_SHORT).show();
+                }
+            }
+        );
     }
     
     private void setupFab() {
@@ -176,10 +206,93 @@ public class MainActivity extends AppCompatActivity implements OTPAdapter.OnOTPC
                     Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show();
                 }
             })
+            .setNeutralButton("Scan QR", (dialog, which) -> {
+                requestCameraPermissionAndScan();
+            })
             .setNegativeButton("Cancel", null)
             .show();
     }
-    
+
+    private void requestCameraPermissionAndScan() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+        } else {
+            launchQrScanner();
+        }
+    }
+
+    private void launchQrScanner() {
+        ScanOptions options = new ScanOptions();
+        options.setPrompt("Scan OTP QR code");
+        options.setBeepEnabled(false);
+        options.setOrientationLocked(true);
+        barcodeLauncher.launch(options);
+    }
+
+    private void parseOtpUri(String otpUri) {
+        try {
+            if (otpUri == null || !otpUri.startsWith("otpauth://")) {
+                throw new IllegalArgumentException("Unsupported QR code format");
+            }
+
+            java.net.URI uri = new java.net.URI(otpUri);
+            String type = uri.getHost();
+            if (type == null || type.isEmpty()) {
+                type = "totp";
+            }
+
+            String path = uri.getPath();
+            String label = "";
+            if (path != null && path.length() > 1) {
+                label = path.substring(1);
+            }
+
+            String issuer = null;
+            String account = null;
+            if (label.contains(":")) {
+                issuer = label.substring(0, label.indexOf(":"));
+                account = label.substring(label.indexOf(":") + 1);
+            } else {
+                account = label;
+            }
+
+            String query = uri.getQuery();
+            String secret = null;
+            if (query != null) {
+                for (String param : query.split("&")) {
+                    String[] pair = param.split("=");
+                    if (pair.length == 2) {
+                        String key = java.net.URLDecoder.decode(pair[0], "UTF-8");
+                        String value = java.net.URLDecoder.decode(pair[1], "UTF-8");
+                        if (key.equalsIgnoreCase("secret")) {
+                            secret = value.replace(" ", "").toUpperCase();
+                        } else if (key.equalsIgnoreCase("issuer") && (issuer == null || issuer.isEmpty())) {
+                            issuer = value;
+                        }
+                    }
+                }
+            }
+
+            if (issuer == null) {
+                issuer = "";
+            }
+            if (account == null) {
+                account = "";
+            }
+            if (secret == null || secret.isEmpty()) {
+                throw new IllegalArgumentException("OTP secret key is missing");
+            }
+
+            OTPAccount newAccount = new OTPAccount(issuer, account, secret);
+            OTPDataManager.getInstance(this).addAccount(newAccount);
+            refreshOTPList();
+            Toast.makeText(this, "OTP account added: " + newAccount.getDisplayLabel(), Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "Unable to parse OTP QR code", Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void showAccountOptionsDialog(OTPAccount account) {
         String[] options = {"Edit", "Delete"};
         
