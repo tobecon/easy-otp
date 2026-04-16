@@ -2,7 +2,10 @@ package com.easyotp.util;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.util.Base64;
+import android.os.Build;
+
+import androidx.security.crypto.EncryptedSharedPreferences;
+import androidx.security.crypto.MasterKeys;
 
 import com.easyotp.model.OTPAccount;
 import com.google.gson.Gson;
@@ -22,8 +25,24 @@ public class OTPDataManager {
     private Gson gson;
     
     private OTPDataManager(Context context) {
-        prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
         gson = new Gson();
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                String masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC);
+                prefs = EncryptedSharedPreferences.create(
+                        context,
+                        PREF_NAME,
+                        masterKeyAlias,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                );
+            } else {
+                prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        }
     }
     
     public static synchronized OTPDataManager getInstance(Context context) {
